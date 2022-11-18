@@ -1,25 +1,60 @@
 pragma solidity >=0.8.0 <0.9.0;
 //SPDX-License-Identifier: MIT
 
-import 'hardhat/console.sol';
 import './ExampleExternalContract.sol';
 
 contract Staker {
   ExampleExternalContract public exampleExternalContract;
 
-  constructor(address exampleExternalContractAddress) public {
+  bool openForWithdraw = false; 
+  uint256 public constant threshold = 1 ether;
+  uint256 public deadline = block.timestamp + 30 seconds;
+  mapping ( address => uint256 ) public balances;
+
+  event Staked(address, uint);
+
+  constructor(address exampleExternalContractAddress) {
     exampleExternalContract = ExampleExternalContract(exampleExternalContractAddress);
   }
 
-  // TODO: Collect funds in a payable `stake()` function and track individual `balances` with a mapping:
-  //  ( make sure to add a `Stake(address,uint256)` event and emit it for the frontend <List/> display )
+  modifier notCompleted() {
+    require(!exampleExternalContract.completed(), "Contract is already completed");
+    _;
+  }
 
-  // TODO: After some `deadline` allow anyone to call an `execute()` function
-  //  It should call `exampleExternalContract.complete{value: address(this).balance}()` to send all the value
+  function stake() public payable {
+    require(block.timestamp < deadline, 'Staking period is over');
+    balances[msg.sender] += msg.value;
+    emit Staked(msg.sender, msg.value);
+  }
 
-  // TODO: if the `threshold` was not met, allow everyone to call a `withdraw()` function
+  function execute() external notCompleted {
+    require(block.timestamp >= deadline, 'Staking period is not over');
+    require(!openForWithdraw, 'Withdraw is already open');
+    if (address(this).balance >= threshold) {
+      exampleExternalContract.complete{value: address(this).balance}();
+    } else {
+      openForWithdraw = true;
+    }
+  }
 
-  // TODO: Add a `timeLeft()` view function that returns the time left before the deadline for the frontend
+  function withdraw() external notCompleted {
+    require(openForWithdraw, 'Withdraw is not open');
 
-  // TODO: Add the `receive()` special function that receives eth and calls stake()
+    uint256 amount = balances[msg.sender];
+    balances[msg.sender] = 0;
+    payable(msg.sender).transfer(amount);
+  }
+
+  function timeLeft() external view returns (uint256) {
+    if (block.timestamp >= deadline) {
+      return 0;
+    } else {
+      return deadline - block.timestamp;
+    }
+  }
+
+  receive() external payable {
+    stake();
+  }
 }
