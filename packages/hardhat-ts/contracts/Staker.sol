@@ -8,7 +8,7 @@ contract Staker {
 
   bool openForWithdraw = false; 
   uint256 public constant threshold = 1 ether;
-  uint256 public deadline = block.timestamp + 30 seconds;
+  uint256 public deadline = block.timestamp + 127 hours;
   mapping ( address => uint256 ) public balances;
 
   event Staked(address, uint);
